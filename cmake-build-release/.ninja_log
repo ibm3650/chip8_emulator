@@ -1,0 +1,4 @@
+# ninja log v5
+4	56	7336753598984731	CMakeFiles/chip8_emulator.dir/stack.c.obj	586c8317eb497bd7
+2	672	7336754290912686	CMakeFiles/chip8_emulator.dir/main.c.obj	28fff93e51ea98ba
+673	729	7336754291453258	chip8_emulator.exe	beec5af34efb0937
