@@ -219,12 +219,12 @@ static inline void opcode_drw_reg_reg_val(uint16_t opcode){
 }
 //OK
 static inline void opcode_skp_reg(uint16_t opcode){
-    if(keypad[X(opcode)])
+    if(keypad[REGISTERS[X(opcode)]])
         PC+=2;
 }
 //OK
 static inline void opcode_sknp_reg(uint16_t opcode){
-    if(!keypad[X(opcode)])
+    if(!keypad[REGISTERS[X(opcode)]])
         PC+=2;
 }
 //OK
@@ -460,7 +460,7 @@ int main(int argc, char *argv[]) {
             0xF0, 0x80, 0xF0, 0x80, 0x80  // F
     };
     SDL_SetMainReady();
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS);
+    SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window* window = SDL_CreateWindow("CHIP-8 Emulator",
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED,
@@ -477,10 +477,12 @@ int main(int argc, char *argv[]) {
     srand(time(0));
 
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\3-corax+.ch8", "rb");
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Tic-Tac-Toe [David Winter].ch8", "rb");
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Pong (1 player).ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Tetris [Fran Dachille, 1991].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Astro Dodge Hires [Revival Studios, 2008] (1).ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Hires Worm V4 [RB-Revival Studios, 2007].ch8", "rb");
-    FILE* file = fopen("C:\\Users\\kandu\\Downloads\\br8kout.ch8", "rb");
+   // FILE* file = fopen("C:\\Users\\kandu\\Downloads\\br8kout.ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Maze [David Winter, 199x].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Zero Demo [zeroZshadow, 2007].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Stars [Sergey Naydenov, 2010].ch8", "rb");
@@ -489,9 +491,67 @@ int main(int argc, char *argv[]) {
     fclose(file);
     //SDL_Thread *thread = SDL_CreateThread(handler, "ThreadName", NULL);
     Uint32 next_time = SDL_GetTicks() + 1000/60;
-
+    SDL_Event event;
     while (run) {
-        SDL_Event event;
+//        while(SDL_PollEvent(&event))
+//        {
+//            switch(event.type)
+//            {
+//                case SDL_QUIT:
+//                    run = 0;
+//                    break;
+//
+//                case SDL_KEYDOWN:
+//
+//                    switch (event.key.keysym.sym)
+//                    {
+//
+//
+//                        case SDLK_x:keypad[0] = 1;break;
+//                        case SDLK_1:keypad[1] = 1;break;
+//                        case SDLK_2:keypad[2] = 1;break;
+//                        case SDLK_3:keypad[3] = 1;break;
+//                        case SDLK_q:keypad[4] = 1;break;
+//                        case SDLK_w:keypad[5] = 1;break;
+//                        case SDLK_e:keypad[6] = 1;break;
+//                        case SDLK_a:keypad[7] = 1;break;
+//                        case SDLK_s:keypad[8] = 1;break;
+//                        case SDLK_d:keypad[9] = 1;break;
+//                        case SDLK_z:keypad[0xA] = 1;break;
+//                        case SDLK_c:keypad[0xB] = 1;break;
+//                        case SDLK_4:keypad[0xC] = 1;break;
+//                        case SDLK_r:keypad[0xD] = 1;break;
+//                        case SDLK_f:keypad[0xE] = 1;break;
+//                        case SDLK_v:keypad[0xF] = 1;break;
+//                    }
+//                    break;
+//
+//                case SDL_KEYUP:
+//
+//                    switch (event.key.keysym.sym)
+//                    {
+//                        case SDLK_x:keypad[0] = 0;break;
+//                        case SDLK_1:keypad[1] = 0;break;
+//                        case SDLK_2:keypad[2] = 0;break;
+//                        case SDLK_3:keypad[3] = 0;break;
+//                        case SDLK_q:keypad[4] = 0;break;
+//                        case SDLK_w:keypad[5] = 0;break;
+//                        case SDLK_e:keypad[6] = 0;break;
+//                        case SDLK_a:keypad[7] = 0;break;
+//                        case SDLK_s:keypad[8] = 0;break;
+//                        case SDLK_d:keypad[9] = 0;break;
+//                        case SDLK_z:keypad[0xA] = 0;break;
+//                        case SDLK_c:keypad[0xB] = 0;break;
+//                        case SDLK_4:keypad[0xC] = 0;break;
+//                        case SDLK_r:keypad[0xD] = 0;break;
+//                        case SDLK_f:keypad[0xE] = 0;break;
+//                        case SDLK_v:keypad[0xF] = 0;break;
+//                    }
+//                    break;
+//            }
+//            break;
+//        }
+//        SDL_Event event;
         while (SDL_PollEvent(&event)) {
 
             if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
@@ -555,6 +615,8 @@ int main(int argc, char *argv[]) {
                 break;
             }
         }
+
+
         Uint32 now = SDL_GetTicks();
 
 
@@ -627,7 +689,7 @@ int main(int argc, char *argv[]) {
         clear_display();
         draw_display();
 
-        while(now+1 >= SDL_GetTicks());
+        while(now== SDL_GetTicks());
     }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
