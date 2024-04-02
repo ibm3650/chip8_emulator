@@ -219,12 +219,12 @@ static inline void opcode_drw_reg_reg_val(uint16_t opcode){
 }
 //OK
 static inline void opcode_skp_reg(uint16_t opcode){
-    if(keypad[(opcode & 0x0F00) >> 8])
+    if(keypad[X(opcode)])
         PC+=2;
 }
 //OK
 static inline void opcode_sknp_reg(uint16_t opcode){
-    if(!keypad[(opcode & 0x0F00) >> 8])
+    if(!keypad[X(opcode)])
         PC+=2;
 }
 //OK
@@ -493,11 +493,8 @@ int main(int argc, char *argv[]) {
     while (run) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
-                run = 0;
-                break;
-            }
-            else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+
+            if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
                 switch (event.key.keysym.sym) {
                     case SDLK_0:
                         keypad[0x0] = event.type == SDL_KEYDOWN;
@@ -551,6 +548,11 @@ int main(int argc, char *argv[]) {
                         break;
 
                 }
+                break;
+            }
+            else if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
+                run = 0;
+                break;
             }
         }
         Uint32 now = SDL_GetTicks();
@@ -625,7 +627,7 @@ int main(int argc, char *argv[]) {
         clear_display();
         draw_display();
 
-        while(now == SDL_GetTicks());
+        while(now+1 >= SDL_GetTicks());
     }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
