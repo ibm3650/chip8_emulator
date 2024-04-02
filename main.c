@@ -1,16 +1,17 @@
 #include <stdio.h>
 #include <stdint.h>
+
 #include <stdlib.h>
 #include <string.h>
-#include <windows.h>
 #include <time.h>
 #include "SDL.h"
 
 #define MEMORY_SIZE 4096
 #define STACK_SIZE 64
 #define REGISTERS_COUNT 16
-#define FRAMEBUFFER_X   64
-#define FRAMEBUFFER_Y   32
+
+
+
 #define BASE_FONTSET_OFFSET  0x50
 #define RESERVED_SPRITE_SIZE    5
 #define PROGRAM_OFFSET  0x200
@@ -33,10 +34,15 @@
 #define VE  0xE
 #define VF  0xF
 
-
+//#define FRAMEBUFFER_X   64
+uint8_t FRAMEBUFFER_X =  64;
+uint8_t FRAMEBUFFER_Y =  32;
+//#define FRAMEBUFFER_Y   32
 static uint8_t memory[MEMORY_SIZE];
 static uint8_t REGISTERS[REGISTERS_COUNT];
-static uint8_t framebuffer[FRAMEBUFFER_X * FRAMEBUFFER_Y];
+static uint8_t framebuffer[64*128];
+static uint8_t keypad[16];
+//static uint8_t framebuffer[FRAMEBUFFER_X * FRAMEBUFFER_Y];
 static uint16_t STACK[STACK_SIZE / sizeof(uint16_t)];
 static uint8_t SP = -1;
 static uint8_t DT = 0;
@@ -45,16 +51,6 @@ static uint16_t I = 0;
 static uint16_t PC = PROGRAM_OFFSET;
 
 SDL_Renderer* renderer;
-
-void prinf_frame(){
-    system("cls");
-    for (int y = 0; y < FRAMEBUFFER_Y; ++y) {
-        for (int x = 0; x < FRAMEBUFFER_X; ++x) {
-            printf("%c", framebuffer[x+ FRAMEBUFFER_X * y] ? '*' : ' ');
-        }
-        printf("\r\n");
-    }
-}
 
 void clear_display(){
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -72,16 +68,12 @@ void draw_display(){
         }
     }
 
-
 }
-
 
 
 static inline void opcode_sys(uint16_t opcode){}
 //OK
 static inline void opcode_cls(uint16_t opcode){
-    //printf("CLS\r\n");
-    //system("cls");
     clear_display();
 }
 //OK
@@ -90,19 +82,15 @@ static inline void opcode_ret(){
 }
 //OK
 static inline void opcode_jp(uint16_t opcode){
-    //printf("JP %#05x\r\n", opcode & 0xFFF);
-    //PC = opcode & 0xFFF;
     PC = (opcode & 0xFFF) - 2;
 }
 //OK
 static inline void opcode_call(uint16_t opcode){
     STACK[++SP] = PC;
-    //PC = opcode & 0xFFF;
     PC = (opcode & 0xFFF) - 2;
 }
 //OK
 static inline void opcode_se_reg_val(uint16_t opcode){
-    //printf("%#05x: SE V%d(%d), %d\r\n", PC,(opcode & 0x0F00) >> 8, REGISTERS[(opcode & 0x0F00) >> 8],(opcode & 0x00FF));
     if(REGISTERS[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
         PC += 2;
 }
@@ -118,7 +106,6 @@ static inline void opcode_se_reg_reg(uint16_t opcode){
 }
 //OK
 static inline void opcode_ld_reg_val(uint16_t opcode){
-    //printf("LD V%d, %#04x\r\n",(opcode & 0x0F00) >> 8, (opcode & 0x00FF));
     REGISTERS[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
 }
 //OK
@@ -155,7 +142,7 @@ static inline void opcode_sub_reg_reg(uint16_t opcode){
 //OK
 static inline void opcode_shr_reg_reg(uint16_t opcode){
     REGISTERS[VF] = REGISTERS[(opcode & 0x0F00) >> 8] & 0x01;
-    REGISTERS[(opcode & 0x0F00) >> 8] >>= 1;
+    REGISTERS[(opcode & 0x0F00) >> 8] <<= 1;
 }
 //OK
 static inline void opcode_subn_reg_reg(uint16_t opcode){
@@ -165,7 +152,7 @@ static inline void opcode_subn_reg_reg(uint16_t opcode){
 //OK
 static inline void opcode_shl_reg_reg(uint16_t opcode){
     REGISTERS[VF] = REGISTERS[(opcode & 0x0F00) >> 8] >= 0x80;
-    REGISTERS[(opcode & 0x0F00) >> 8] <<= 1;
+    REGISTERS[(opcode & 0x0F00) >> 8] >>= 1;
 }
 //OK
 static inline void opcode_sne_reg_reg(uint16_t opcode){
@@ -174,69 +161,42 @@ static inline void opcode_sne_reg_reg(uint16_t opcode){
 }
 //OK
 static inline void opcode_ld_i_val(uint16_t opcode){
-    //printf("LD I, %#05x\r\n", opcode & 0x0FFF);
     I = opcode & 0x0FFF;
 }
 //OK
 static inline void opcode_jp_reg_val(uint16_t opcode){
-   // printf("JP V0, %#05x\r\n", opcode & 0xFFF);
     PC = (opcode & 0x0FFF) + REGISTERS[V0];
 }
 //OK
-
-unsigned char generate_random_byte() {
-    HCRYPTPROV hCryptProv;
-    unsigned char random_byte;
-
-    if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
-        fprintf(stderr, "Ошибка при инициализации криптопровайдера\n");
-        exit(1);
-    }
-
-    if (!CryptGenRandom(hCryptProv, sizeof(random_byte), &random_byte)) {
-        fprintf(stderr, "Ошибка генерации случайного числа\n");
-        exit(1);
-    }
-
-    CryptReleaseContext(hCryptProv, 0);
-    return random_byte;
-}
-
-
 static inline void opcode_rnd_reg_val(uint16_t opcode){
    REGISTERS[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF);
-   //REGISTERS[(opcode & 0x0F00) >> 8] = generate_random_byte() & (opcode & 0x00FF);
-  // printf("RND V%d, %#04x=%d\r\n",  (opcode & 0x0F00) >> 8,(opcode & 0x00FF), REGISTERS[(opcode & 0x0F00) >> 8]);
 }
-
+//OK
 static inline void opcode_drw_reg_reg_val(uint16_t opcode){
     uint8_t x = REGISTERS[(opcode & 0x0F00) >> 8];
     uint8_t y = REGISTERS[(opcode & 0x00F0) >> 4];
-
-    //if(x>=FRAMEBUFFER_X)
-   //     x -= FRAMEBUFFER_X;
-    //if(y>=FRAMEBUFFER_Y)
-    //    y -= FRAMEBUFFER_Y;
+    if(x >= FRAMEBUFFER_X || y >= FRAMEBUFFER_Y)
+        return;
     uint8_t n = opcode & 0x000F;
-   // printf("DRW V%d, V%d, %d\r\n",  (opcode & 0x0F00) >> 8 ,(opcode & 0x00F0) >> 4 ,n);
     uint16_t index = x + y * FRAMEBUFFER_X;
     for(uint8_t y_pos = 0; y_pos < n; y_pos++){
         for(uint8_t x_pos = 0; x_pos < 8; x_pos++){
             framebuffer[index + x_pos + y_pos * FRAMEBUFFER_X] ^= (memory[I+y_pos] & (0x80 >> x_pos)) >> (7-x_pos);
         }
     }
-
-    clear_display();
-    draw_display();
-    //prinf_frame();
 }
-
-static inline void opcode_skp_reg(uint16_t opcode){}
-
-static inline void opcode_sknp_reg(uint16_t opcode){}
+//OK
+static inline void opcode_skp_reg(uint16_t opcode){
+    if(keypad[(opcode & 0x0F00) >> 8])
+        PC+=2;
+}
+//OK
+static inline void opcode_sknp_reg(uint16_t opcode){
+    if(!keypad[(opcode & 0x0F00) >> 8])
+        PC+=2;
+}
 //OK
 static inline void opcode_ld_reg_dt(uint16_t opcode){
-   // printf("LD V%d(%d), DT(%d)\r\n", (opcode & 0x0F00) >> 8, REGISTERS[(opcode & 0x0F00) >> 8], DT);
     REGISTERS[(opcode & 0x0F00) >> 8] = DT;
 }
 
@@ -259,10 +219,15 @@ static inline void opcode_ld_f_reg(uint16_t opcode){
 }
 //OK
 static inline void opcode_ld_b_reg(uint16_t opcode){
-    const uint8_t reg_val = REGISTERS[(opcode & 0x0F00) >> 8];
-    memory[I] = reg_val / 100;
-    memory[I + 1] = (reg_val / 10) % 10;
-    memory[I + 2] = (reg_val / 100) % 10;
+    uint8_t reg_val = REGISTERS[(opcode & 0x0F00) >> 8];
+//    memory[I] = reg_val / 100;
+//    memory[I + 1] = (reg_val / 10) % 10;
+//    memory[I + 2] = (reg_val / 100) % 10;
+    memory[I]     = (reg_val - (reg_val % 100)) / 100;
+    reg_val -= memory[I] * 100;
+    memory[I + 1] = (reg_val - (reg_val % 10)) / 10;
+    reg_val -= memory[I+1] * 10;
+    memory[I + 2] = reg_val;
 }
 //OK
 static inline void opcode_ld_i_reg(uint16_t opcode){
@@ -369,27 +334,81 @@ static  inline void opcode_E(uint16_t opcode){
 }
 
 
+int run  =1;
 
+_Noreturn int handler(void *data){
+    while(1){
+        Uint32 now = SDL_GetTicks();
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
+                run = 0;
+                break;
+            }
+            else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_0:
+                        keypad[0x0] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_1:
+                        keypad[0x1] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_2:
+                        keypad[0x2] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_3:
+                        keypad[0x3] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_4:
+                        keypad[0x4] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_5:
+                        keypad[0x5] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_6:
+                        keypad[0x6] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_7:
+                        keypad[0x7] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_8:
+                        keypad[0x8] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_9:
+                        keypad[0x9] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_a:
+                        keypad[0xA] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_b:
+                        keypad[0xB] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_c:
+                        keypad[0xC] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_d:
+                        keypad[0xD] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_e:
+                        keypad[0xE] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_f:
+                        keypad[0xF] = event.type == SDL_KEYDOWN;
+                        break;
+                    default:
+                        break;
 
-
-
-
-#define TIMER_ID 1
-#define TIMER_INTERVAL 1000 / 60 // Интервал в миллисекундах для частоты 60 Гц
-
-VOID CALLBACK TimerDT(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
-    if (DT != 0) {
-        InterlockedDecrement(&DT);
-      //  printf("DT=%d\r\n",DT);
+                }
+            }
+        }
+        while(now+100!=SDL_GetTicks());
     }
 }
 
 
 
 
-
-
-int main() {
+int main(int argc, char *argv[]) {
     const uint8_t base_fontset[80] = {
             0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
             0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -408,44 +427,109 @@ int main() {
             0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
             0xF0, 0x80, 0xF0, 0x80, 0x80  // F
     };
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+    SDL_SetMainReady();
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS);
     SDL_Window* window = SDL_CreateWindow("CHIP-8 Emulator",
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED,
                                           FRAMEBUFFER_X * 10,
-                                          FRAMEBUFFER_Y * 10,
+                                          FRAMEBUFFER_X * 10,
+                                          //FRAMEBUFFER_Y * 10,
                                           SDL_WINDOW_SHOWN);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     memcpy(memory + BASE_FONTSET_OFFSET, base_fontset, sizeof(base_fontset));
-    UINT_PTR timerId = SetTimer(NULL, TIMER_ID, TIMER_INTERVAL, TimerDT);
-    if (timerId == 0) {
-        printf("Ошибка при создании таймера\n");
-        return 1;
-    }
+
     srand(time(0));
-//    for (int i = 0; i < 16; ++i) {
-//        printf("%d\r\n", rand());
-//    }
-   //return 9;
+
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\3-corax+.ch8", "rb");
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Tetris [Fran Dachille, 1991].ch8", "rb");
     FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Astro Dodge Hires [Revival Studios, 2008] (1).ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Hires Worm V4 [RB-Revival Studios, 2007].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Maze [David Winter, 199x].ch8", "rb");
+   // FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Zero Demo [zeroZshadow, 2007].ch8", "rb");
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Stars [Sergey Naydenov, 2010].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Trip8 Demo (2008) [Revival Studios].ch8", "rb");
     fread(memory + PROGRAM_OFFSET, MEMORY_SIZE - PROGRAM_OFFSET, sizeof(uint8_t), file);
     fclose(file);
+    //SDL_Thread *thread = SDL_CreateThread(handler, "ThreadName", NULL);
+    Uint32 next_time = SDL_GetTicks() + 1000/60;
 
-    MSG msg;
-    Uint32 next_time = SDL_GetTicks() + TIMER_INTERVAL;
-    //while (GetMessage(&msg, NULL, 0, 0)) {
-    while (1) {
-        TranslateMessage(&msg);
+    while (run) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
+                run = 0;
+                break;
+            }
+            else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_0:
+                        keypad[0x0] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_1:
+                        keypad[0x1] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_2:
+                        keypad[0x2] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_3:
+                        keypad[0x3] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_4:
+                        keypad[0x4] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_5:
+                        keypad[0x5] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_6:
+                        keypad[0x6] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_7:
+                        keypad[0x7] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_8:
+                        keypad[0x8] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_9:
+                        keypad[0x9] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_a:
+                        keypad[0xA] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_b:
+                        keypad[0xB] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_c:
+                        keypad[0xC] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_d:
+                        keypad[0xD] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_e:
+                        keypad[0xE] = event.type == SDL_KEYDOWN;
+                        break;
+                    case SDLK_f:
+                        keypad[0xF] = event.type == SDL_KEYDOWN;
+                        break;
+                    default:
+                        break;
+
+                }
+            }
+        }
+        Uint32 now = SDL_GetTicks();
 
 
         uint16_t opcode = memory[PC];
         opcode <<= 8;
         opcode |= memory[PC + 1];
-
+        //64x64 mode
+        if ((PC==0x200) && (opcode==0x1260)) {
+            // Init 64x64 hires mode
+            FRAMEBUFFER_Y=64;
+            opcode=0x12C0;  // Make the interperter jump to address 0x2c0
+        }
         switch (opcode & 0xF000) {
             case 0x0000:
                 opcode_0(opcode);
@@ -496,77 +580,20 @@ int main() {
                 opcode_F(opcode);//ok
                 break;
         }
-
-
-
         PC += 2;
-       // DispatchMessage(&msg);
-       //Sleep(15);
-        // Отображение на экране
-        SDL_RenderPresent(renderer);
-
-        // Обработка событий SDL (например, выход из цикла при закрытии окна)
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                break;
-            }
-        }
-        Uint32 now = SDL_GetTicks();
         if (now >= next_time) {
-            // Обработка кадра
-            if (DT != 0) {
+            if (DT != 0)
                 DT--;
-                //  printf("DT=%d\r\n",DT);
-            }
-            // Обновляем время для следующего кадра
-            next_time += TIMER_INTERVAL;
+            next_time += 1000/60;
         }
+        SDL_RenderPresent(renderer);
+        clear_display();
+        draw_display();
+
+        while(now == SDL_GetTicks());
     }
-//    I = 0x50;
-//    REGISTERS[V0] = 0;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x55;
-//    REGISTERS[V0] = 5;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x5A;
-//    REGISTERS[V0] = 10;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x5F;
-//    REGISTERS[V0] = 15;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x64;
-//    REGISTERS[V0] = 20;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x69;
-//    REGISTERS[V0] = 25;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x6E;
-//    REGISTERS[V0] = 30;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x73;
-//    REGISTERS[V0] = 35;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//
-//    I = 0x78;
-//    REGISTERS[V0] = 40;
-//    REGISTERS[V1] = 0;
-//    opcode_drw_reg_reg_val(0xD015);
-//    prinf_frame();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 0;
 }
