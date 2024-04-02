@@ -70,120 +70,152 @@ void draw_display(){
 
 }
 
+#define NNN(x)  ((x) & 0xFFF)
+#define X(x)  (((x) & 0x0F00) >> 8)
+#define Y(x)  (((x) & 0x00F0) >> 4)
+#define N(x)  ((x) & 0x000F)
+#define KK(x)  ((x) & 0x00FF)
+#define STACK_PUSH(x)   (STACK[++SP] = (x))
+#define STACK_POP(x)   ((x) = STACK[SP--])
 
 static inline void opcode_sys(uint16_t opcode){}
+
 //OK
 static inline void opcode_cls(uint16_t opcode){
-    clear_display();
+   // clear_display();
+
+    memset(framebuffer, 0, FRAMEBUFFER_X*FRAMEBUFFER_Y);
+    //SDL_RenderPresent(renderer);
+   // clear_display();
+    //draw_display();
 }
+
 //OK
 static inline void opcode_ret(){
-    PC = STACK[SP--];
+    STACK_POP(PC);
 }
 //OK
 static inline void opcode_jp(uint16_t opcode){
-    PC = (opcode & 0xFFF) - 2;
+    PC = NNN(opcode) - 2;
 }
 //OK
 static inline void opcode_call(uint16_t opcode){
-    STACK[++SP] = PC;
-    PC = (opcode & 0xFFF) - 2;
+    STACK_PUSH(PC);
+    PC = NNN(opcode) - 2;
 }
+
 //OK
 static inline void opcode_se_reg_val(uint16_t opcode){
-    if(REGISTERS[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
+    if(REGISTERS[X(opcode)] == KK(opcode))
         PC += 2;
 }
 //OK
 static inline void opcode_sne_reg_val(uint16_t opcode){
-    if(REGISTERS[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF))
+    if(REGISTERS[X(opcode)] != KK(opcode))
         PC += 2;
 }
 //OK
 static inline void opcode_se_reg_reg(uint16_t opcode){
-    if(REGISTERS[(opcode & 0x0F00) >> 8] == REGISTERS[(opcode & 0x00F0) >> 4])
+    if(REGISTERS[X(opcode)] == REGISTERS[Y(opcode)])
         PC += 2;
 }
 //OK
 static inline void opcode_ld_reg_val(uint16_t opcode){
-    REGISTERS[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
+    REGISTERS[X(opcode)] = KK(opcode);
 }
 //OK
 static inline void opcode_add_reg_val(uint16_t opcode){
-    REGISTERS[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
+    REGISTERS[X(opcode)] += KK(opcode);
 }
 //OK
 static inline void opcode_ld_reg_reg(uint16_t opcode){
-    REGISTERS[(opcode & 0x0F00) >> 8] = REGISTERS[(opcode & 0x00F0) >> 4];
+    REGISTERS[X(opcode)] = REGISTERS[Y(opcode)];
 }
 //OK
 static inline void opcode_or_reg_reg(uint16_t opcode){
-    REGISTERS[(opcode & 0x0F00) >> 8] |= REGISTERS[(opcode & 0x00F0) >> 4];
+    REGISTERS[X(opcode)] |= REGISTERS[Y(opcode)];
 }
 //OK
 static inline void opcode_and_reg_reg(uint16_t opcode){
-    REGISTERS[(opcode & 0x0F00) >> 8] &= REGISTERS[(opcode & 0x00F0) >> 4];
+    REGISTERS[X(opcode)] &= REGISTERS[Y(opcode)];
 }
 //OK
 static inline void opcode_xor_reg_reg(uint16_t opcode){
-    REGISTERS[(opcode & 0x0F00) >> 8] ^= REGISTERS[(opcode & 0x00F0) >> 4];
+    REGISTERS[X(opcode)] ^= REGISTERS[Y(opcode)];
 }
 //OK
 static inline void opcode_add_reg_reg(uint16_t opcode){
-    uint16_t tmp = REGISTERS[(opcode & 0x0F00) >> 8] + REGISTERS[(opcode & 0x00F0) >> 4];
+    uint16_t tmp = REGISTERS[X(opcode)] + REGISTERS[Y(opcode)];
     REGISTERS[VF] = tmp > 0xFF;
-    REGISTERS[(opcode & 0x0F00) >> 8] = tmp;
+    REGISTERS[X(opcode)] = tmp & 0xFF;
 }
 //OK
 static inline void opcode_sub_reg_reg(uint16_t opcode){
-    REGISTERS[VF] = REGISTERS[(opcode & 0x0F00) >> 8] > REGISTERS[(opcode & 0x00F0) >> 4];
-    REGISTERS[(opcode & 0x0F00) >> 8] -= REGISTERS[(opcode & 0x00F0) >> 4];
+    REGISTERS[VF] = REGISTERS[X(opcode)] > REGISTERS[Y(opcode)];
+    REGISTERS[X(opcode)] -= REGISTERS[Y(opcode)];
 }
 //OK
 static inline void opcode_shr_reg_reg(uint16_t opcode){
-    REGISTERS[VF] = REGISTERS[(opcode & 0x0F00) >> 8] & 0x01;
-    REGISTERS[(opcode & 0x0F00) >> 8] <<= 1;
+    REGISTERS[VF] = REGISTERS[X(opcode)] & 0x01;
+    REGISTERS[X(opcode)] >>= 1;
 }
 //OK
 static inline void opcode_subn_reg_reg(uint16_t opcode){
-    REGISTERS[VF] = REGISTERS[(opcode & 0x0F00) >> 8] < REGISTERS[(opcode & 0x00F0) >> 4];
-    REGISTERS[(opcode & 0x0F00) >> 8] = REGISTERS[(opcode & 0x00F0) >> 4] - REGISTERS[(opcode & 0x0F00) >> 8];
+    REGISTERS[VF] = REGISTERS[X(opcode)] < REGISTERS[Y(opcode)];
+    REGISTERS[X(opcode)] = REGISTERS[Y(opcode)] - REGISTERS[X(opcode)];
 }
 //OK
 static inline void opcode_shl_reg_reg(uint16_t opcode){
-    REGISTERS[VF] = REGISTERS[(opcode & 0x0F00) >> 8] >= 0x80;
-    REGISTERS[(opcode & 0x0F00) >> 8] >>= 1;
+    REGISTERS[VF] = REGISTERS[X(opcode)] >> 7;
+    REGISTERS[X(opcode)] <<= 1;
 }
 //OK
 static inline void opcode_sne_reg_reg(uint16_t opcode){
-    if(REGISTERS[(opcode & 0x0F00) >> 8] != REGISTERS[(opcode & 0x00F0) >> 4])
+    if(REGISTERS[X(opcode)] != REGISTERS[Y(opcode)])
         PC += 2;
 }
 //OK
 static inline void opcode_ld_i_val(uint16_t opcode){
-    I = opcode & 0x0FFF;
+    I = NNN(opcode);
 }
 //OK
 static inline void opcode_jp_reg_val(uint16_t opcode){
-    PC = (opcode & 0x0FFF) + REGISTERS[V0];
+    PC = NNN(opcode) + REGISTERS[V0] - 2;
 }
 //OK
 static inline void opcode_rnd_reg_val(uint16_t opcode){
-   REGISTERS[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF);
+   REGISTERS[X(opcode)] = (rand() % 0xFF) & KK(opcode);
 }
 //OK
 static inline void opcode_drw_reg_reg_val(uint16_t opcode){
-    uint8_t x = REGISTERS[(opcode & 0x0F00) >> 8];
-    uint8_t y = REGISTERS[(opcode & 0x00F0) >> 4];
-    if(x >= FRAMEBUFFER_X || y >= FRAMEBUFFER_Y)
-        return;
-    uint8_t n = opcode & 0x000F;
-    uint16_t index = x + y * FRAMEBUFFER_X;
-    for(uint8_t y_pos = 0; y_pos < n; y_pos++){
-        for(uint8_t x_pos = 0; x_pos < 8; x_pos++){
-            framebuffer[index + x_pos + y_pos * FRAMEBUFFER_X] ^= (memory[I+y_pos] & (0x80 >> x_pos)) >> (7-x_pos);
+    uint8_t x = REGISTERS[X(opcode)];
+    uint8_t y = REGISTERS[Y(opcode)];
+    uint8_t n = N(opcode);
+
+    REGISTERS[VF] = 0;
+    for (int yline = 0; yline < n; yline++) {
+        uint8_t pixel = memory[I + yline];
+        for(int xline = 0; xline < 8; xline++) {
+            if((pixel & (0x80 >> xline)) != 0) {
+                if(framebuffer[(x + xline + ((y + yline) * 64))] == 1){
+                    REGISTERS[VF] = 1;
+                }
+                framebuffer[x + xline + ((y + yline) * 64)] ^= 1;
+            }
+
         }
+
     }
+//    uint16_t index = x + y * FRAMEBUFFER_X;
+//    for(uint8_t y_pos = 0; y_pos < n; y_pos++){
+//        for(uint8_t x_pos = 0; x_pos < 8; x_pos++){
+//            uint8_t pixel = (memory[I+y_pos] & (0x80 >> x_pos)) >> (7-x_pos);
+//            if(pixel) {
+//                REGISTERS[VF] = framebuffer[index + x_pos + y_pos * FRAMEBUFFER_X] == 1;
+//                framebuffer[index + x_pos + y_pos * FRAMEBUFFER_X] ^= 1;
+//            }
+//        }
+//    }
 }
 //OK
 static inline void opcode_skp_reg(uint16_t opcode){
@@ -278,13 +310,13 @@ static  inline void opcode_8(uint16_t opcode){
             opcode_sub_reg_reg(opcode);
             break;
         case 0x0006:
-            opcode_shl_reg_reg(opcode);
+            opcode_shr_reg_reg(opcode);
             break;
         case 0x0007:
             opcode_subn_reg_reg(opcode);
             break;
         case 0x000E:
-            opcode_shr_reg_reg(opcode);
+            opcode_shl_reg_reg(opcode);
             break;
     }
 }
@@ -439,15 +471,18 @@ int main(int argc, char *argv[]) {
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     memcpy(memory + BASE_FONTSET_OFFSET, base_fontset, sizeof(base_fontset));
-
+    memset(keypad,0,16);
+    memset(REGISTERS,0,16);
+    memset(STACK,0,64);
     srand(time(0));
 
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\3-corax+.ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Tetris [Fran Dachille, 1991].ch8", "rb");
-    FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Astro Dodge Hires [Revival Studios, 2008] (1).ch8", "rb");
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Astro Dodge Hires [Revival Studios, 2008] (1).ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Hires Worm V4 [RB-Revival Studios, 2007].ch8", "rb");
+    FILE* file = fopen("C:\\Users\\kandu\\Downloads\\br8kout.ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Maze [David Winter, 199x].ch8", "rb");
-   // FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Zero Demo [zeroZshadow, 2007].ch8", "rb");
+    //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Zero Demo [zeroZshadow, 2007].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Stars [Sergey Naydenov, 2010].ch8", "rb");
     //FILE* file = fopen("C:\\Users\\kandu\\Downloads\\Trip8 Demo (2008) [Revival Studios].ch8", "rb");
     fread(memory + PROGRAM_OFFSET, MEMORY_SIZE - PROGRAM_OFFSET, sizeof(uint8_t), file);
